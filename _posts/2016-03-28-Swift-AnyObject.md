@@ -28,6 +28,7 @@ x.setTitle("", forSegmentAtIndex: 0)    // 5. 运行时报错: unrecognized sele
 所有的类实际上都是实现了这个`protocol`, 当一个变量声明成AnyObject的时候, 那么所有可以被这个变量访问的类中, 被标记为@objc的方法和被标记为@objc的属性对这个变量都是可见的, 而且是隐式解包的optional类型, 也就是`!`.
 
 这样就可以解释上述代码中的问题了:
+
 - `1`中`stringValue`是`NSNumber`的property, `x.stringValue`的返回值类型是`String!`, 因为对于AnyObject来讲, `stringValue`是隐式解包的optional. 如果`x`的实际类型是`NSNumber`的话, 返回值是正常的`String!`; 其它情况下, 返回值是`nil`
 - `2`中的`testabc`并不是AnyObject的子类中`@objc`的属性, 编译的时候找不到.
 - `3`中的`backgroundColor`虽然是`@objc`的属性, 但是因为在UIView和CALayer上都有定义, 编译器不知道用哪个.
