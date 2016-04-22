@@ -115,7 +115,67 @@ debug_value %0 : $Optional<String>, let, name "a", argno 1 // id: %1
   //----返回Optional<String>
 ```
 
-但是要注意的是, 上述代码中, `test`函数接收的参数是`B -> A?`的一个闭包. 我们可以传入`B? -> A`的闭包, 但是如果`test`接收的是`B? -> A`的闭包, 我们不能传入`B -> A`的闭包, 如下:
+``` swift
+func f(a: String?) -> String? {
+    let x = "hehe"
+    return x
+}
+let a = "yupengyang"
+f(a)
+```
+
+在命令行用`swiftc -emit-sil your_swfit_file`就可以看到编译后的中间语言. 先看调用时, 函数参数是`optional`而传入的不是`optional`的情况
+
+```swift
+let a = "yupengyang"
+f(a)
+// 这两行对应的中间语言大概如下:
+%12 = global_addr @_Tv4test1aSS : $*String      // users: %19, %21
+  // function_ref Swift.String.init (_builtinStringLiteral : Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
+  %13 = function_ref @_TFSSCfT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %18
+  %14 = metatype $@thin String.Type               // user: %18
+  %15 = string_literal utf8 "yupengyang"          // user: %18
+  %16 = integer_literal $Builtin.Word, 10         // user: %18
+  %17 = integer_literal $Builtin.Int1, -1         // user: %18
+  %18 = apply %13(%15, %16, %17, %14) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %19
+  store %18 to %12 : $*String                     // id: %19
+  //------------到此为止创建了String "yupengyang"
+  
+  // function_ref test.f (Swift.Optional<Swift.String>) -> Swift.Optional<Swift.String>
+  %20 = function_ref @_TF4test1fFGSqSS_GSqSS_ : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String> // user: %24
+  %21 = load %12 : $*String                       // users: %22, %23
+  retain_value %21 : $String                      // id: %22
+  %23 = enum $Optional<String>, #Optional.Some!enumelt.1, %21 : $String // user: %24
+  //------------上面这一句就是把String转成了Optional<String>了
+  
+  %24 = apply %20(%23) : $@convention(thin) (@owned Optional<String>) -> @owned Optional<String> // user: %25
+```
+
+在看函数定义的返回值类型是`optional`, 而实际返回的类型不是`optional`的情况, 函数`f`对应的中间代码摘取如下
+
+``` swift
+debug_value %0 : $Optional<String>, let, name "a", argno 1 // id: %1
+  // function_ref Swift.String.init (_builtinStringLiteral : Builtin.RawPointer, byteSize : Builtin.Word, isASCII : Builtin.Int1) -> Swift.String
+  %2 = function_ref @_TFSSCfT21_builtinStringLiteralBp8byteSizeBw7isASCIIBi1__SS : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %3 = metatype $@thin String.Type                // user: %7
+  %4 = string_literal utf8 "hehe"                 // user: %7
+  %5 = integer_literal $Builtin.Word, 4           // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = apply %2(%4, %5, %6, %3) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // users: %8, %9
+  debug_value %7 : $String, let, name "x"         // id: %8
+  //----以上部分创建了变量x, 也就是我们要返回的String
+  
+  %9 = enum $Optional<String>, #Optional.Some!enumelt.1, %7 : $String // user: %11
+  //----这一句把String转成了Optional<String>了
+  
+  release_value %0 : $Optional<String>            // id: %10
+  return %9 : $Optional<String>                   // id: %11
+  //----返回Optional<String>
+```
+
+由此可见, swift是在编译时期就做了这个转换的.
+
+下面回头我们最开始的例子, 参数是闭包的情况. 上面的代码中, `test`函数接收的参数是`B -> A?`的一个闭包. 我们可以传入`B? -> A`的闭包, 但是如果`test`接收的是`B? -> A`的闭包, 我们不能传入`B -> A`的闭包, 如下:
 
 ``` swift
 class A {}
